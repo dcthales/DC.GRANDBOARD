@@ -3,19 +3,26 @@
 // =====================
 
 const MONTHS = [
-  "Janvier","Février","Mars","Avril","Mai","Juin",
-  "Juillet","Août","Septembre","Octobre","Novembre","Décembre"
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
 ];
 
 const BASE_CATEGORIES = [
-  "Podcast","Documentaire","Film","Vidéo","Exposition","Livre","Article",
-  "Interview","Musique","Image","Marque","Personnalité","Adresse","Site/application"
+  "Podcast", "Documentaire", "Film", "Vidéo", "Exposition", "Livre", "Article",
+  "Interview", "Musique", "Image", "Marque", "Personnalité", "Adresse", "Site/application"
 ];
 
-// Cache local (optionnel, juste pour fallback)
-const STORAGE_KEY = "grandboard_entries_v2_cache";
-const YEARS_KEY = "grandboard_years_v2";
-const EXTRA_CATEGORIES_KEY = "grandboard_extra_categories_v2";
+// Cache local (fallback seulement)
+const STORAGE_KEY = "grandboard_entries_cache_v3";
+const YEARS_KEY = "grandboard_years_v3";
+const EXTRA_CATEGORIES_KEY = "grandboard_extra_categories_v3";
+
+// Supabase
+const TABLE_NAME = "Entries";
+const BUCKET_NAME = "images";
+
+// Code d'accès (⚠️ visible dans le JS -> pas une sécurité "forte")
+const REQUIRED_CODE = "DC-Thales";
 
 // =====================
 // HELPERS localStorage
@@ -75,6 +82,7 @@ const fieldYear = document.getElementById("year");
 const fieldImageUrl = document.getElementById("imageUrl");
 const fieldImageFile = document.getElementById("imageFile");
 const modalTitle = document.getElementById("modalTitle");
+const accessCodeEl = document.getElementById("accessCode");
 
 // modal gestion années / catégories
 const manageBackdrop = document.getElementById("manageBackdrop");
@@ -93,16 +101,19 @@ const editCategoryBtn = document.getElementById("editCategoryBtn");
 const deleteCategoryBtn = document.getElementById("deleteCategoryBtn");
 
 // =====================
-// SUPABASE (table + storage)
+// SUPABASE HELPERS
 // =====================
 
-const TABLE_NAME = "Entries";
-const BUCKET_NAME = "images";
+function ensureSupabaseClient() {
+  if (!window.sb) throw new Error("Supabase client not found (window.sb). Vérifie index.html.");
+}
 
-// Upload image -> { publicUrl, path }
 async function uploadImageToSupabase(file, entryId) {
+  ensureSupabaseClient();
+
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const path = `entries/${entryId}-${Date.now()}.${ext}`;
+  const safeExt = ext.replace(/[^a-z0-9]/g, "") || "jpg";
+  const path = `entries/${entryId}-${Date.now()}.${safeExt}`;
 
   const { error: uploadError } = await window.sb
     .storage
@@ -115,12 +126,13 @@ async function uploadImageToSupabase(file, entryId) {
   return { publicUrl: data.publicUrl, path };
 }
 
-// Charge depuis Supabase (source de vérité)
 async function loadSharedData() {
   try {
-   const { data, error } = await window.sb
-  .from("Entries")
-  .select("*");
+    ensureSupabaseClient();
+
+    const { data, error } = await window.sb
+      .from(TABLE_NAME)
+      .select("*");
 
     if (error) throw error;
 
@@ -140,15 +152,16 @@ async function loadSharedData() {
 
     saveJSON(STORAGE_KEY, entries);
   } catch (e) {
-    console.error("Supabase load error, fallback localStorage:", JSON.stringify(e, null, 2));
+    console.error("Supabase load error, fallback localStorage:", e);
     entries = loadJSON(STORAGE_KEY, []);
   }
 }
 
-// Upsert (create/update) dans Supabase
 async function upsertEntryToSupabase(entry) {
+  ensureSupabaseClient();
+
   const row = {
-    id: entry.id, // OBLIGATOIRE (id text PK)
+    id: entry.id,
     title: entry.title,
     category: entry.category,
     theme1: entry.theme1,
@@ -168,13 +181,21 @@ async function upsertEntryToSupabase(entry) {
   if (error) throw error;
 }
 
-// Delete dans Supabase
 async function deleteEntryFromSupabase(id) {
+  ensureSupabaseClient();
+
   const { error } = await window.sb
     .from(TABLE_NAME)
     .delete()
     .eq("id", id);
 
+  if (error) throw error;
+}
+
+async function deleteImageFromSupabase(path) {
+  if (!path) return;
+  ensureSupabaseClient();
+  const { error } = await window.sb.storage.from(BUCKET_NAME).remove([path]);
   if (error) throw error;
 }
 
@@ -247,8 +268,11 @@ async function init() {
     filterTheme1.value = "";
     filterTheme2.value = "";
     filterYear.value = "";
+
     document.querySelectorAll(".month-btn").forEach((b) => b.classList.remove("active"));
-    document.querySelector(".month-btn[data-value='']").classList.add("active");
+    const defaultBtn = document.querySelector(".month-btn[data-value='']");
+    if (defaultBtn) defaultBtn.classList.add("active");
+
     updateMonthLabel();
     render();
   });
@@ -261,6 +285,16 @@ async function init() {
     e.preventDefault();
     saveFromForm();
   });
+
+  // ✅ Entrée dans le champ code => submit du form
+  if (accessCodeEl) {
+    accessCodeEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        entryForm.requestSubmit();
+      }
+    });
+  }
 
   // modal gestion catégories/années
   openManageModalBtn.addEventListener("click", openManageModal);
@@ -395,6 +429,7 @@ function render() {
 
     const image = document.createElement("div");
     image.className = "card-image";
+
     if (e.imageUrl) {
       const img = document.createElement("img");
       img.src = e.imageUrl;
@@ -489,11 +524,15 @@ function openModalForCreate() {
   const now = new Date();
   modalTitle.textContent = "Ajouter une entrée";
   entryForm.reset();
+
   fieldId.value = "";
   fieldMonth.value = String(now.getMonth() + 1);
   fieldYear.value = String(now.getFullYear());
   fieldImageFile.value = "";
+  if (accessCodeEl) accessCodeEl.value = "";
+
   modalBackdrop.classList.add("open");
+  setTimeout(() => accessCodeEl?.focus(), 0);
 }
 
 function openModalForEdit(id) {
@@ -502,6 +541,7 @@ function openModalForEdit(id) {
 
   modalTitle.textContent = "Modifier l'entrée";
   entryForm.reset();
+
   fieldId.value = entry.id;
   fieldTitle.value = entry.title || "";
   fieldCategory.value = entry.category || "";
@@ -513,12 +553,15 @@ function openModalForEdit(id) {
   fieldYear.value = String(entry.year || "");
   fieldImageUrl.value = entry.imageUrl || "";
   fieldImageFile.value = "";
+  if (accessCodeEl) accessCodeEl.value = "";
+
   modalBackdrop.classList.add("open");
+  setTimeout(() => accessCodeEl?.focus(), 0);
 }
 
 function closeModal() {
   modalBackdrop.classList.remove("open");
-  document.getElementById("accessCode").value = "";
+  if (accessCodeEl) accessCodeEl.value = "";
 }
 
 // =====================
@@ -526,80 +569,61 @@ function closeModal() {
 // =====================
 
 function saveFromForm() {
-  const REQUIRED_CODE = "DC-Thales";
-  const enteredCode = document.getElementById("accessCode").value.trim();
-
-  if (enteredCode !== REQUIRED_CODE) {
-    alert("Code incorrect. Accès refusé.");
-    return;
-  }
-
-  // ton code existant continue ici
-  const id =
-    fieldId.value ||
-    (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-
-  const existingIndex = entries.findIndex((e) => e.id === id);
-  const existing = existingIndex >= 0 ? entries[existingIndex] : null;
-
-  // ... le reste inchangé
-}
-
-  const existingIndex = entries.findIndex((e) => e.id === id);
-
-  const chosenYear = Number(fieldYear.value);
-  if (!years.includes(chosenYear)) {
-    years.push(chosenYear);
-    years.sort((a, b) => a - b);
-    saveJSON(YEARS_KEY, years);
-    refreshYearsSelects();
-    refreshManageLists();
-  }
-
-  const base = {
-    id,
-    title: fieldTitle.value.trim(),
-    category: fieldCategory.value.trim(),
-    theme1: fieldTheme1.value.trim(),
-    theme2: fieldTheme2.value.trim(),
-    description: fieldDescription.value.trim().slice(0, 200),
-    link: fieldLink.value.trim(),
-    month: Number(fieldMonth.value),
-    year: chosenYear,
-    imageUrl: fieldImageUrl.value.trim(),
-    imagePath: ""
-  };
-
-  const file = fieldImageFile.files[0];
-
   (async () => {
     try {
+      const enteredCode = (accessCodeEl?.value || "").trim();
+      if (enteredCode !== REQUIRED_CODE) {
+        alert("Code incorrect. Accès refusé.");
+        return;
+      }
+
+      const id =
+        fieldId.value ||
+        (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+
+      const chosenYear = Number(fieldYear.value);
+      if (!years.includes(chosenYear)) {
+        years.push(chosenYear);
+        years.sort((a, b) => a - b);
+        saveJSON(YEARS_KEY, years);
+        refreshYearsSelects();
+        refreshManageLists();
+      }
+
+      const base = {
+        id,
+        title: fieldTitle.value.trim(),
+        category: fieldCategory.value.trim(),
+        theme1: fieldTheme1.value.trim(),
+        theme2: fieldTheme2.value.trim(),
+        description: fieldDescription.value.trim().slice(0, 200),
+        link: fieldLink.value.trim(),
+        month: Number(fieldMonth.value),
+        year: chosenYear,
+        imageUrl: fieldImageUrl.value.trim(),
+        imagePath: ""
+      };
+
+      const file = fieldImageFile.files[0];
+
+      // Upload image (si fichier)
       if (file) {
         const uploaded = await uploadImageToSupabase(file, id);
         base.imageUrl = uploaded.publicUrl;
         base.imagePath = uploaded.path;
       }
 
-      // UI instant
-      if (existingIndex >= 0) entries[existingIndex] = base;
-      else entries.push(base);
-      saveJSON(STORAGE_KEY, entries);
+      // DB = source de vérité
+      await upsertEntryToSupabase(base);
+
+      // Reload depuis Supabase
+      await loadSharedData();
 
       refreshThemesFilters();
       refreshCategoriesList();
       refreshManageLists();
       render();
       closeModal();
-
-      // DB
-      await upsertEntryToSupabase(base);
-
-      // resync
-      await loadSharedData();
-      refreshThemesFilters();
-      refreshCategoriesList();
-      refreshManageLists();
-      render();
     } catch (e) {
       console.error("Erreur sauvegarde:", e);
       alert("Impossible de sauvegarder en ligne.");
@@ -608,6 +632,12 @@ function saveFromForm() {
 }
 
 function deleteEntry(id) {
+  const enteredCode = (prompt('Entre le code pour supprimer :') || "").trim();
+  if (enteredCode !== REQUIRED_CODE) {
+    alert("Code incorrect. Suppression refusée.");
+    return;
+  }
+
   if (!confirm("Supprimer cette entrée ?")) return;
 
   (async () => {
@@ -615,20 +645,11 @@ function deleteEntry(id) {
       const removed = entries.find((e) => e.id === id);
       const imgPath = removed?.imagePath;
 
-      // UI instant
-      entries = entries.filter((e) => e.id !== id);
-      saveJSON(STORAGE_KEY, entries);
-      refreshThemesFilters();
-      refreshCategoriesList();
-      refreshManageLists();
-      render();
-
-      // DB
       await deleteEntryFromSupabase(id);
 
-      // optionnel: supprimer aussi l'image
+      // Optionnel : supprimer aussi l'image si on a le path
       if (imgPath) {
-        await window.sb.storage.from(BUCKET_NAME).remove([imgPath]);
+        try { await deleteImageFromSupabase(imgPath); } catch (e) { console.warn("Image delete warning:", e); }
       }
 
       await loadSharedData();
