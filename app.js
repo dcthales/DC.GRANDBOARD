@@ -866,4 +866,7 @@ function handleDeleteCategory() {
 // START
 // =====================
 
-init();
+document.addEventListener("DOMContentLoaded", async () => {
+  setupGate();
+  await init();
+});
