@@ -9,12 +9,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet" />
 </head>
+
 <body>
   <header class="topbar">
     <div class="topbar-title">GRAND BOARD</div>
     <div class="topbar-year" id="currentYear"></div>
   </header>
-
 
   <main class="layout">
     <!-- Panneau filtres -->
@@ -22,9 +22,9 @@
       <h2>Filtres</h2>
 
       <label class="filter-label">Catégorie</label>
-<select id="filterCategory">
-  <option value="">Toutes les catégories</option>
-</select>
+      <select id="filterCategory">
+        <option value="">Toutes les catégories</option>
+      </select>
 
       <label class="filter-label">Thème 1</label>
       <select id="filterTheme1">
@@ -42,25 +42,14 @@
       </div>
 
       <label class="filter-label">Année</label>
-<select id="filterYear">
-  <option value="">Toutes les années</option>
-</select>
-
+      <select id="filterYear">
+        <option value="">Toutes les années</option>
+      </select>
 
       <button id="applyFilters" class="btn btn-dark">Filtrer</button>
       <button id="resetFilters" class="btn btn-light">Réinitialiser</button>
       <button id="openManageModal" class="btn btn-add">AJOUT</button>
     </aside>
-
-    <div class="field">
-  <label for="accessCode">Code d’accès</label>
-  <input
-    id="accessCode"
-    type="text"
-    placeholder="Entrez le code"
-    required
-  />
-</div>
 
     <!-- Board -->
     <section class="board-area">
@@ -82,130 +71,140 @@
       </div>
 
       <form id="entryForm" class="entry-form">
-  <input type="hidden" id="entryId" />
+        <input type="hidden" id="entryId" />
 
-  <div class="field">
-    <label for="title">Titre de l'entrée</label>
-    <input id="title" type="text" required />
-  </div>
+        <div class="field">
+          <label for="title">Titre de l'entrée</label>
+          <input id="title" type="text" required />
+        </div>
 
-  <div class="field">
-    <label for="category">Catégories</label>
-    <select id="category" required></select>
-  </div>
+        <div class="field">
+          <label for="category">Catégories</label>
+          <select id="category" required></select>
+        </div>
 
-  <div class="field">
-    <label for="theme1">Thème 1</label>
-    <input id="theme1" type="text" />
-  </div>
+        <div class="field">
+          <label for="theme1">Thème 1</label>
+          <input id="theme1" type="text" />
+        </div>
 
-  <div class="field">
-    <label for="theme2">Thème 2</label>
-    <input id="theme2" type="text" />
-  </div>
+        <div class="field">
+          <label for="theme2">Thème 2</label>
+          <input id="theme2" type="text" />
+        </div>
 
-  <div class="field">
-    <label for="description">Description (200 caractères max.)</label>
-    <textarea id="description" rows="3" maxlength="200"></textarea>
-  </div>
+        <div class="field">
+          <label for="description">Description (200 caractères max.)</label>
+          <textarea id="description" rows="3" maxlength="200"></textarea>
+        </div>
 
-  <div class="field">
-    <label for="link">Lien</label>
-    <input id="link" type="url" placeholder="https://..." />
-  </div>
+        <div class="field">
+          <label for="link">Lien</label>
+          <input id="link" type="url" placeholder="https://..." />
+        </div>
 
-  <div class="field">
-    <label for="month">Mois</label>
-    <select id="month" required></select>
-  </div>
+        <div class="field">
+          <label for="month">Mois</label>
+          <select id="month" required></select>
+        </div>
 
-  <div class="field">
-    <label for="year">Année</label>
-    <select id="year" required></select>
-  </div>
+        <div class="field">
+          <label for="year">Année</label>
+          <select id="year" required></select>
+        </div>
 
-  <div class="field">
-    <label for="imageUrl">Image (URL)</label>
-    <input id="imageUrl" type="url" placeholder="Colle une URL d'image (optionnel)" />
-  </div>
+        <div class="field">
+          <label for="imageUrl">Image (URL)</label>
+          <input id="imageUrl" type="url" placeholder="Colle une URL d'image (optionnel)" />
+        </div>
 
-  <div class="field">
-    <label for="imageFile">Image (fichier depuis l’ordinateur)</label>
-    <input id="imageFile" type="file" accept="image/*" />
-  </div>
+        <div class="field">
+          <label for="imageFile">Image (fichier depuis l’ordinateur)</label>
+          <input id="imageFile" type="file" accept="image/*" />
+        </div>
 
-  <div class="modal-footer">
-    <button type="button" class="btn btn-light" id="cancelForm">Annuler</button>
-    <button type="submit" class="btn btn-dark">Sauvegarder</button>
-  </div>
-</form>
+        <!-- ✅ Code d'accès : DOIT être dans le form -->
+        <div class="field">
+          <label for="accessCode">Code d’accès</label>
+          <input
+            id="accessCode"
+            type="text"
+            placeholder="DC-Thales"
+            required
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" id="cancelForm">Annuler</button>
+          <button type="submit" class="btn btn-dark">Sauvegarder</button>
+        </div>
+      </form>
     </div>
   </div>
-<!-- Modal gestion années / catégories -->
-<div class="modal-backdrop" id="manageBackdrop">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>Gérer les années et catégories</h2>
-      <button class="close-btn" id="closeManageModal">×</button>
-    </div>
 
-    <div class="entry-form">
-      <h3 class="section-title">Années</h3>
-
-      <div class="field">
-        <label for="manageYearSelect">Année existante</label>
-        <select id="manageYearSelect"></select>
+  <!-- Modal gestion années / catégories -->
+  <div class="modal-backdrop" id="manageBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Gérer les années et catégories</h2>
+        <button class="close-btn" id="closeManageModal">×</button>
       </div>
 
-      <div class="field">
-        <label for="manageYearInput">Nouvelle valeur</label>
-        <input id="manageYearInput" type="number" placeholder="Ex: 2026" />
-      </div>
+      <div class="entry-form">
+        <h3 class="section-title">Années</h3>
 
-     <div class="modal-footer">
-  <button type="button" class="btn btn-light" id="addYearBtn">Ajouter</button>
-  <button type="button" class="btn btn-dark" id="editYearBtn">Renommer</button>
-  <button type="button" class="btn btn-light" id="deleteYearBtn">Supprimer</button>
-</div>
+        <div class="field">
+          <label for="manageYearSelect">Année existante</label>
+          <select id="manageYearSelect"></select>
+        </div>
 
-      <hr class="section-separator" />
+        <div class="field">
+          <label for="manageYearInput">Nouvelle valeur</label>
+          <input id="manageYearInput" type="number" placeholder="Ex: 2026" />
+        </div>
 
-      <h3 class="section-title">Catégories</h3>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" id="addYearBtn">Ajouter</button>
+          <button type="button" class="btn btn-dark" id="editYearBtn">Renommer</button>
+          <button type="button" class="btn btn-light" id="deleteYearBtn">Supprimer</button>
+        </div>
 
-      <div class="field">
-        <label for="manageCategorySelect">Catégorie existante</label>
-        <select id="manageCategorySelect"></select>
-      </div>
+        <hr class="section-separator" />
 
-      <div class="field">
-        <label for="manageCategoryInput">Nouvelle valeur</label>
-        <input id="manageCategoryInput" type="text" placeholder="Ex: Magazine" />
-      </div>
+        <h3 class="section-title">Catégories</h3>
 
-      <div class="modal-footer">
-  <button type="button" class="btn btn-light" id="addCategoryBtn">Ajouter</button>
-  <button type="button" class="btn btn-dark" id="editCategoryBtn">Renommer</button>
-  <button type="button" class="btn btn-light" id="deleteCategoryBtn">Supprimer</button>
-</div>
+        <div class="field">
+          <label for="manageCategorySelect">Catégorie existante</label>
+          <select id="manageCategorySelect"></select>
+        </div>
 
-      <div class="modal-footer">
-        <button type="button" class="btn btn-light" id="cancelManage">Fermer</button>
+        <div class="field">
+          <label for="manageCategoryInput">Nouvelle valeur</label>
+          <input id="manageCategoryInput" type="text" placeholder="Ex: Magazine" />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" id="addCategoryBtn">Ajouter</button>
+          <button type="button" class="btn btn-dark" id="editCategoryBtn">Renommer</button>
+          <button type="button" class="btn btn-light" id="deleteCategoryBtn">Supprimer</button>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" id="cancelManage">Fermer</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = "https://dxilpdygitggghwbatzl.supabase.co";
-
-    // IMPORTANT : colle ici la VRAIE "anon public key" de Supabase (commence par eyJ...)
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWxwZHlnaXRnZ2dod2JhdHpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjY2MjEsImV4cCI6MjA4MTU0MjYyMX0.agX-nXxgf-ix_W9e88-yZMldHO78M6qEFpN11n0zIIM";
 
     window.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Test immédiat
     window.sb.from("Entries").select("id").limit(1).then(({ data, error }) => {
       console.log("Supabase test:", error ? "❌ KO" : "✅ OK", { data, error });
     });
