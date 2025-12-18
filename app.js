@@ -518,6 +518,7 @@ function openModalForEdit(id) {
 
 function closeModal() {
   modalBackdrop.classList.remove("open");
+  document.getElementById("accessCode").value = "";
 }
 
 // =====================
