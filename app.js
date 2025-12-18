@@ -12,18 +12,19 @@ const BASE_CATEGORIES = [
   "Interview", "Musique", "Image", "Marque", "Personnalité", "Adresse", "Site/application"
 ];
 
-// Cache local (fallback seulement)
-const STORAGE_KEY = "grandboard_entries_cache_v3";
-const YEARS_KEY = "grandboard_years_v3";
-const EXTRA_CATEGORIES_KEY = "grandboard_extra_categories_v3";
+// Cache local (fallback)
+const STORAGE_KEY = "grandboard_entries_cache_v4";
+const YEARS_KEY = "grandboard_years_v4";
+const EXTRA_CATEGORIES_KEY = "grandboard_extra_categories_v4";
 
 // Supabase
 const TABLE_NAME = "Entries";
 const BUCKET_NAME = "images";
 
 // =====================
-// GATE (code d'accès une seule fois)
+// GATE (code d'accès une seule fois par session)
 // =====================
+
 const ACCESS_CODE = "DC-Thales";
 const ACCESS_FLAG_KEY = "grandboard_access_ok_session";
 
@@ -47,15 +48,21 @@ function setupGate() {
   const input = document.getElementById("gateCode");
   const error = document.getElementById("gateError");
 
-  if (!gate || !form || !input) return;
+  if (!gate || !form || !input) {
+    // Si le HTML du gate n'existe pas, on ne bloque pas
+    return;
+  }
 
   if (isAccessOk()) {
     unlockUI();
+    init(); // ✅ on lance l'app direct
     return;
   }
 
   lockUI();
-  input.focus();
+  if (error) error.style.display = "none";
+  input.value = "";
+  setTimeout(() => input.focus(), 0);
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -64,6 +71,7 @@ function setupGate() {
     if (val === ACCESS_CODE) {
       sessionStorage.setItem(ACCESS_FLAG_KEY, "1");
       unlockUI();
+      init(); // ✅ on lance l'app seulement après le bon code
     } else {
       if (error) error.style.display = "block";
       input.value = "";
@@ -71,6 +79,7 @@ function setupGate() {
     }
   });
 }
+
 // =====================
 // HELPERS localStorage
 // =====================
@@ -129,7 +138,6 @@ const fieldYear = document.getElementById("year");
 const fieldImageUrl = document.getElementById("imageUrl");
 const fieldImageFile = document.getElementById("imageFile");
 const modalTitle = document.getElementById("modalTitle");
-const accessCodeEl = document.getElementById("accessCode");
 
 // modal gestion années / catégories
 const manageBackdrop = document.getElementById("manageBackdrop");
@@ -250,12 +258,16 @@ async function deleteImageFromSupabase(path) {
 // INIT
 // =====================
 
+let _initialized = false;
+
 async function init() {
-   setupGate();
+  if (_initialized) return;
+  _initialized = true;
+
   await loadSharedData();
 
   const now = new Date();
-  yearTop.textContent = now.getFullYear();
+  if (yearTop) yearTop.textContent = now.getFullYear();
 
   if (!years.includes(now.getFullYear())) years.push(now.getFullYear());
   entries.forEach((e) => {
@@ -265,97 +277,98 @@ async function init() {
   saveJSON(YEARS_KEY, years);
 
   // mois dans le formulaire
-  fieldMonth.innerHTML = "";
-  MONTHS.forEach((m, index) => {
-    const opt = document.createElement("option");
-    opt.value = index + 1;
-    opt.textContent = m;
-    fieldMonth.appendChild(opt);
-  });
+  if (fieldMonth) {
+    fieldMonth.innerHTML = "";
+    MONTHS.forEach((m, index) => {
+      const opt = document.createElement("option");
+      opt.value = index + 1;
+      opt.textContent = m;
+      fieldMonth.appendChild(opt);
+    });
+  }
 
   // boutons mois filtres
-  monthsContainer.innerHTML = "";
+  if (monthsContainer) {
+    monthsContainer.innerHTML = "";
 
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.textContent = "Voir tout";
-  allBtn.className = "month-btn active";
-  allBtn.dataset.value = "";
-  monthsContainer.appendChild(allBtn);
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.textContent = "Voir tout";
+    allBtn.className = "month-btn active";
+    allBtn.dataset.value = "";
+    monthsContainer.appendChild(allBtn);
 
-  MONTHS.forEach((m, i) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "month-btn";
-    btn.textContent = m;
-    btn.dataset.value = String(i + 1);
-    monthsContainer.appendChild(btn);
-  });
+    MONTHS.forEach((m, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "month-btn";
+      btn.textContent = m;
+      btn.dataset.value = String(i + 1);
+      monthsContainer.appendChild(btn);
+    });
 
-  monthsContainer.addEventListener("click", (e) => {
-    if (e.target.matches(".month-btn")) {
-      document.querySelectorAll(".month-btn").forEach((b) => b.classList.remove("active"));
-      e.target.classList.add("active");
-      filters.month = e.target.dataset.value || "";
-      updateMonthLabel();
-      render();
-    }
-  });
-
-  applyFiltersBtn.addEventListener("click", () => {
-    filters.category = filterCategory.value;
-    filters.theme1 = filterTheme1.value;
-    filters.theme2 = filterTheme2.value;
-    filters.year = filterYear.value;
-    render();
-  });
-
-  resetFiltersBtn.addEventListener("click", () => {
-    filters = { category: "", theme1: "", theme2: "", month: "", year: "" };
-    filterCategory.value = "";
-    filterTheme1.value = "";
-    filterTheme2.value = "";
-    filterYear.value = "";
-
-    document.querySelectorAll(".month-btn").forEach((b) => b.classList.remove("active"));
-    const defaultBtn = document.querySelector(".month-btn[data-value='']");
-    if (defaultBtn) defaultBtn.classList.add("active");
-
-    updateMonthLabel();
-    render();
-  });
-
-  openAddFormBtn.addEventListener("click", openModalForCreate);
-  closeModalBtn.addEventListener("click", closeModal);
-  cancelFormBtn.addEventListener("click", closeModal);
-
-  entryForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    saveFromForm();
-  });
-
-  // ✅ Entrée dans le champ code => submit du form
-  if (accessCodeEl) {
-    accessCodeEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        entryForm.requestSubmit();
+    monthsContainer.addEventListener("click", (e) => {
+      if (e.target.matches(".month-btn")) {
+        document.querySelectorAll(".month-btn").forEach((b) => b.classList.remove("active"));
+        e.target.classList.add("active");
+        filters.month = e.target.dataset.value || "";
+        updateMonthLabel();
+        render();
       }
     });
   }
 
+  if (applyFiltersBtn) {
+    applyFiltersBtn.addEventListener("click", () => {
+      filters.category = filterCategory?.value || "";
+      filters.theme1 = filterTheme1?.value || "";
+      filters.theme2 = filterTheme2?.value || "";
+      filters.year = filterYear?.value || "";
+      render();
+    });
+  }
+
+  if (resetFiltersBtn) {
+    resetFiltersBtn.addEventListener("click", () => {
+      filters = { category: "", theme1: "", theme2: "", month: "", year: "" };
+
+      if (filterCategory) filterCategory.value = "";
+      if (filterTheme1) filterTheme1.value = "";
+      if (filterTheme2) filterTheme2.value = "";
+      if (filterYear) filterYear.value = "";
+
+      document.querySelectorAll(".month-btn").forEach((b) => b.classList.remove("active"));
+      const defaultBtn = document.querySelector(".month-btn[data-value='']");
+      if (defaultBtn) defaultBtn.classList.add("active");
+
+      updateMonthLabel();
+      render();
+    });
+  }
+
+  if (openAddFormBtn) openAddFormBtn.addEventListener("click", openModalForCreate);
+  if (closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
+  if (cancelFormBtn) cancelFormBtn.addEventListener("click", closeModal);
+
+  if (entryForm) {
+    entryForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      saveFromForm();
+    });
+  }
+
   // modal gestion catégories/années
-  openManageModalBtn.addEventListener("click", openManageModal);
-  closeManageModalBtn.addEventListener("click", closeManageModal);
-  cancelManageBtn.addEventListener("click", closeManageModal);
+  if (openManageModalBtn) openManageModalBtn.addEventListener("click", openManageModal);
+  if (closeManageModalBtn) closeManageModalBtn.addEventListener("click", closeManageModal);
+  if (cancelManageBtn) cancelManageBtn.addEventListener("click", closeManageModal);
 
-  addYearBtn.addEventListener("click", handleAddYear);
-  editYearBtn.addEventListener("click", handleEditYear);
-  deleteYearBtn.addEventListener("click", handleDeleteYear);
+  if (addYearBtn) addYearBtn.addEventListener("click", handleAddYear);
+  if (editYearBtn) editYearBtn.addEventListener("click", handleEditYear);
+  if (deleteYearBtn) deleteYearBtn.addEventListener("click", handleDeleteYear);
 
-  addCategoryBtn.addEventListener("click", handleAddCategory);
-  editCategoryBtn.addEventListener("click", handleEditCategory);
-  deleteCategoryBtn.addEventListener("click", handleDeleteCategory);
+  if (addCategoryBtn) addCategoryBtn.addEventListener("click", handleAddCategory);
+  if (editCategoryBtn) editCategoryBtn.addEventListener("click", handleEditCategory);
+  if (deleteCategoryBtn) deleteCategoryBtn.addEventListener("click", handleDeleteCategory);
 
   refreshYearsSelects();
   refreshCategoriesList();
@@ -370,26 +383,31 @@ async function init() {
 // =====================
 
 function updateMonthLabel() {
+  if (!selectedMonthLabel) return;
   if (!filters.month) selectedMonthLabel.textContent = "TOUT";
   else selectedMonthLabel.textContent = MONTHS[Number(filters.month) - 1].toUpperCase();
 }
 
 function refreshYearsSelects() {
-  filterYear.innerHTML = '<option value="">Toutes les années</option>';
-  years.slice().sort((a, b) => a - b).forEach((y) => {
-    const opt = document.createElement("option");
-    opt.value = y;
-    opt.textContent = y;
-    filterYear.appendChild(opt);
-  });
+  if (filterYear) {
+    filterYear.innerHTML = '<option value="">Toutes les années</option>';
+    years.slice().sort((a, b) => a - b).forEach((y) => {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      filterYear.appendChild(opt);
+    });
+  }
 
-  fieldYear.innerHTML = "";
-  years.slice().sort((a, b) => a - b).forEach((y) => {
-    const opt = document.createElement("option");
-    opt.value = y;
-    opt.textContent = y;
-    fieldYear.appendChild(opt);
-  });
+  if (fieldYear) {
+    fieldYear.innerHTML = "";
+    years.slice().sort((a, b) => a - b).forEach((y) => {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      fieldYear.appendChild(opt);
+    });
+  }
 }
 
 function getAllCategories() {
@@ -401,45 +419,53 @@ function getAllCategories() {
 
 function refreshCategoriesList() {
   const all = getAllCategories();
-  const currentFilter = filterCategory.value;
-  const currentForm = fieldCategory.value;
+  const currentFilter = filterCategory?.value || "";
+  const currentForm = fieldCategory?.value || "";
 
-  filterCategory.innerHTML = '<option value="">Toutes les catégories</option>';
-  all.forEach((cat) => {
-    const opt = document.createElement("option");
-    opt.value = cat;
-    opt.textContent = cat;
-    filterCategory.appendChild(opt);
-  });
-  if (all.includes(currentFilter)) filterCategory.value = currentFilter;
+  if (filterCategory) {
+    filterCategory.innerHTML = '<option value="">Toutes les catégories</option>';
+    all.forEach((cat) => {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = cat;
+      filterCategory.appendChild(opt);
+    });
+    if (all.includes(currentFilter)) filterCategory.value = currentFilter;
+  }
 
-  fieldCategory.innerHTML = "";
-  all.forEach((cat) => {
-    const opt = document.createElement("option");
-    opt.value = cat;
-    opt.textContent = cat;
-    fieldCategory.appendChild(opt);
-  });
-  if (all.includes(currentForm)) fieldCategory.value = currentForm;
+  if (fieldCategory) {
+    fieldCategory.innerHTML = "";
+    all.forEach((cat) => {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = cat;
+      fieldCategory.appendChild(opt);
+    });
+    if (all.includes(currentForm)) fieldCategory.value = currentForm;
+  }
 }
 
 function refreshManageLists() {
-  manageYearSelect.innerHTML = "";
-  years.slice().sort((a, b) => a - b).forEach((y) => {
-    const opt = document.createElement("option");
-    opt.value = y;
-    opt.textContent = y;
-    manageYearSelect.appendChild(opt);
-  });
+  if (manageYearSelect) {
+    manageYearSelect.innerHTML = "";
+    years.slice().sort((a, b) => a - b).forEach((y) => {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      manageYearSelect.appendChild(opt);
+    });
+  }
 
-  const all = getAllCategories();
-  manageCategorySelect.innerHTML = "";
-  all.forEach((cat) => {
-    const opt = document.createElement("option");
-    opt.value = cat;
-    opt.textContent = cat;
-    manageCategorySelect.appendChild(opt);
-  });
+  if (manageCategorySelect) {
+    const all = getAllCategories();
+    manageCategorySelect.innerHTML = "";
+    all.forEach((cat) => {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = cat;
+      manageCategorySelect.appendChild(opt);
+    });
+  }
 }
 
 // =====================
@@ -447,6 +473,7 @@ function refreshManageLists() {
 // =====================
 
 function render() {
+  if (!cardsGrid) return;
   cardsGrid.innerHTML = "";
 
   const filtered = entries.filter((e) => {
@@ -477,7 +504,6 @@ function render() {
 
     const image = document.createElement("div");
     image.className = "card-image";
-
     if (e.imageUrl) {
       const img = document.createElement("img");
       img.src = e.imageUrl;
@@ -570,25 +596,23 @@ function render() {
 
 function openModalForCreate() {
   const now = new Date();
-  modalTitle.textContent = "Ajouter une entrée";
-  entryForm.reset();
+  if (modalTitle) modalTitle.textContent = "Ajouter une entrée";
+  if (entryForm) entryForm.reset();
 
-  fieldId.value = "";
-  fieldMonth.value = String(now.getMonth() + 1);
-  fieldYear.value = String(now.getFullYear());
-  fieldImageFile.value = "";
-  if (accessCodeEl) accessCodeEl.value = "";
+  if (fieldId) fieldId.value = "";
+  if (fieldMonth) fieldMonth.value = String(now.getMonth() + 1);
+  if (fieldYear) fieldYear.value = String(now.getFullYear());
+  if (fieldImageFile) fieldImageFile.value = "";
 
-  modalBackdrop.classList.add("open");
-  setTimeout(() => accessCodeEl?.focus(), 0);
+  if (modalBackdrop) modalBackdrop.classList.add("open");
 }
 
 function openModalForEdit(id) {
   const entry = entries.find((e) => e.id === id);
   if (!entry) return;
 
-  modalTitle.textContent = "Modifier l'entrée";
-  entryForm.reset();
+  if (modalTitle) modalTitle.textContent = "Modifier l'entrée";
+  if (entryForm) entryForm.reset();
 
   fieldId.value = entry.id;
   fieldTitle.value = entry.title || "";
@@ -601,21 +625,19 @@ function openModalForEdit(id) {
   fieldYear.value = String(entry.year || "");
   fieldImageUrl.value = entry.imageUrl || "";
   fieldImageFile.value = "";
-  if (accessCodeEl) accessCodeEl.value = "";
 
-  modalBackdrop.classList.add("open");
-  setTimeout(() => accessCodeEl?.focus(), 0);
+  if (modalBackdrop) modalBackdrop.classList.add("open");
 }
 
 function closeModal() {
-  modalBackdrop.classList.remove("open");
-  if (accessCodeEl) accessCodeEl.value = "";
+  if (modalBackdrop) modalBackdrop.classList.remove("open");
 }
 
 // =====================
 // SAVE / DELETE
 // =====================
 
+function saveFromForm() {
   const id =
     fieldId.value ||
     (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
@@ -659,6 +681,7 @@ function closeModal() {
       else entries.push(base);
 
       saveJSON(STORAGE_KEY, entries);
+
       refreshThemesFilters();
       refreshCategoriesList();
       refreshManageLists();
@@ -666,7 +689,11 @@ function closeModal() {
       closeModal();
 
       await upsertEntryToSupabase(base);
+
       await loadSharedData();
+      refreshThemesFilters();
+      refreshCategoriesList();
+      refreshManageLists();
       render();
     } catch (e) {
       console.error("Erreur sauvegarde:", e);
@@ -676,12 +703,6 @@ function closeModal() {
 }
 
 function deleteEntry(id) {
-  const enteredCode = (prompt('Entre le code pour supprimer :') || "").trim();
-  if (enteredCode !== REQUIRED_CODE) {
-    alert("Code incorrect. Suppression refusée.");
-    return;
-  }
-
   if (!confirm("Supprimer cette entrée ?")) return;
 
   (async () => {
@@ -691,9 +712,9 @@ function deleteEntry(id) {
 
       await deleteEntryFromSupabase(id);
 
-      // Optionnel : supprimer aussi l'image si on a le path
       if (imgPath) {
-        try { await deleteImageFromSupabase(imgPath); } catch (e) { console.warn("Image delete warning:", e); }
+        try { await deleteImageFromSupabase(imgPath); }
+        catch (e) { console.warn("Image delete warning:", e); }
       }
 
       await loadSharedData();
@@ -721,11 +742,11 @@ function refreshThemesFilters() {
     if (e.theme2) themes2.add(e.theme2);
   });
 
-  const currentT1 = filterTheme1.value;
-  const currentT2 = filterTheme2.value;
+  const currentT1 = filterTheme1?.value || "";
+  const currentT2 = filterTheme2?.value || "";
 
-  filterTheme1.innerHTML = '<option value="">Tous les thèmes 1</option>';
-  filterTheme2.innerHTML = '<option value="">Tous les thèmes 2</option>';
+  if (filterTheme1) filterTheme1.innerHTML = '<option value="">Tous les thèmes 1</option>';
+  if (filterTheme2) filterTheme2.innerHTML = '<option value="">Tous les thèmes 2</option>';
 
   [...themes1].sort((a, b) => a.localeCompare(b, "fr")).forEach((t) => {
     const opt = document.createElement("option");
@@ -741,8 +762,8 @@ function refreshThemesFilters() {
     filterTheme2.appendChild(opt);
   });
 
-  filterTheme1.value = currentT1;
-  filterTheme2.value = currentT2;
+  if (filterTheme1) filterTheme1.value = currentT1;
+  if (filterTheme2) filterTheme2.value = currentT2;
 }
 
 // =====================
@@ -751,11 +772,11 @@ function refreshThemesFilters() {
 
 function openManageModal() {
   refreshManageLists();
-  manageBackdrop.classList.add("open");
+  if (manageBackdrop) manageBackdrop.classList.add("open");
 }
 
 function closeManageModal() {
-  manageBackdrop.classList.remove("open");
+  if (manageBackdrop) manageBackdrop.classList.remove("open");
 }
 
 // =====================
@@ -763,7 +784,7 @@ function closeManageModal() {
 // =====================
 
 function handleAddYear() {
-  const val = Number(manageYearInput.value);
+  const val = Number(manageYearInput?.value);
   if (!val) return;
   if (!years.includes(val)) {
     years.push(val);
@@ -772,12 +793,12 @@ function handleAddYear() {
     refreshYearsSelects();
     refreshManageLists();
   }
-  manageYearInput.value = "";
+  if (manageYearInput) manageYearInput.value = "";
 }
 
 function handleEditYear() {
-  const oldVal = Number(manageYearSelect.value);
-  const newVal = Number(manageYearInput.value);
+  const oldVal = Number(manageYearSelect?.value);
+  const newVal = Number(manageYearInput?.value);
   if (!oldVal || !newVal) return;
 
   years = years.map((y) => (y === oldVal ? newVal : y));
@@ -789,11 +810,11 @@ function handleEditYear() {
   refreshYearsSelects();
   refreshManageLists();
   render();
-  manageYearInput.value = "";
+  if (manageYearInput) manageYearInput.value = "";
 }
 
 function handleDeleteYear() {
-  const val = Number(manageYearSelect.value);
+  const val = Number(manageYearSelect?.value);
   if (!val) return;
 
   const used = entries.some((e) => e.year === val);
@@ -815,7 +836,7 @@ function handleDeleteYear() {
 // =====================
 
 function handleAddCategory() {
-  const val = manageCategoryInput.value.trim();
+  const val = (manageCategoryInput?.value || "").trim();
   if (!val) return;
   if (!extraCategories.includes(val) && !BASE_CATEGORIES.includes(val)) {
     extraCategories.push(val);
@@ -823,12 +844,12 @@ function handleAddCategory() {
   }
   refreshCategoriesList();
   refreshManageLists();
-  manageCategoryInput.value = "";
+  if (manageCategoryInput) manageCategoryInput.value = "";
 }
 
 function handleEditCategory() {
-  const oldCat = manageCategorySelect.value;
-  const newCat = manageCategoryInput.value.trim();
+  const oldCat = manageCategorySelect?.value || "";
+  const newCat = (manageCategoryInput?.value || "").trim();
   if (!oldCat || !newCat) return;
 
   extraCategories = extraCategories.map((c) => (c === oldCat ? newCat : c));
@@ -840,11 +861,11 @@ function handleEditCategory() {
   refreshCategoriesList();
   refreshManageLists();
   render();
-  manageCategoryInput.value = "";
+  if (manageCategoryInput) manageCategoryInput.value = "";
 }
 
 function handleDeleteCategory() {
-  const cat = manageCategorySelect.value;
+  const cat = manageCategorySelect?.value || "";
   if (!cat) return;
 
   const used = entries.some((e) => e.category === cat);
@@ -866,7 +887,6 @@ function handleDeleteCategory() {
 // START
 // =====================
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
   setupGate();
-  await init();
 });
