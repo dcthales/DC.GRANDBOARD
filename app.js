@@ -525,9 +525,24 @@ function closeModal() {
 // =====================
 
 function saveFromForm() {
+  const REQUIRED_CODE = "DC-Thales";
+  const enteredCode = document.getElementById("accessCode").value.trim();
+
+  if (enteredCode !== REQUIRED_CODE) {
+    alert("Code incorrect. Accès refusé.");
+    return;
+  }
+
+  // ton code existant continue ici
   const id =
     fieldId.value ||
     (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+
+  const existingIndex = entries.findIndex((e) => e.id === id);
+  const existing = existingIndex >= 0 ? entries[existingIndex] : null;
+
+  // ... le reste inchangé
+}
 
   const existingIndex = entries.findIndex((e) => e.id === id);
 
