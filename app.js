@@ -21,9 +21,56 @@ const EXTRA_CATEGORIES_KEY = "grandboard_extra_categories_v3";
 const TABLE_NAME = "Entries";
 const BUCKET_NAME = "images";
 
-// Code d'accès (⚠️ visible dans le JS -> pas une sécurité "forte")
-const REQUIRED_CODE = "DC-Thales";
+// =====================
+// GATE (code d'accès une seule fois)
+// =====================
+const ACCESS_CODE = "DC-Thales";
+const ACCESS_FLAG_KEY = "grandboard_access_ok_session";
 
+function isAccessOk() {
+  return sessionStorage.getItem(ACCESS_FLAG_KEY) === "1";
+}
+
+function lockUI() {
+  const gate = document.getElementById("gate");
+  if (gate) gate.style.display = "flex";
+}
+
+function unlockUI() {
+  const gate = document.getElementById("gate");
+  if (gate) gate.style.display = "none";
+}
+
+function setupGate() {
+  const gate = document.getElementById("gate");
+  const form = document.getElementById("gateForm");
+  const input = document.getElementById("gateCode");
+  const error = document.getElementById("gateError");
+
+  if (!gate || !form || !input) return;
+
+  if (isAccessOk()) {
+    unlockUI();
+    return;
+  }
+
+  lockUI();
+  input.focus();
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const val = (input.value || "").trim();
+
+    if (val === ACCESS_CODE) {
+      sessionStorage.setItem(ACCESS_FLAG_KEY, "1");
+      unlockUI();
+    } else {
+      if (error) error.style.display = "block";
+      input.value = "";
+      input.focus();
+    }
+  });
+}
 // =====================
 // HELPERS localStorage
 // =====================
@@ -204,6 +251,7 @@ async function deleteImageFromSupabase(path) {
 // =====================
 
 async function init() {
+   setupGate();
   await loadSharedData();
 
   const now = new Date();
@@ -567,14 +615,6 @@ function closeModal() {
 // =====================
 // SAVE / DELETE
 // =====================
-function saveFromForm() {
-  const REQUIRED_CODE = "DC-Thales";
-  const enteredCode = document.getElementById("accessCode").value.trim();
-
-  if (enteredCode !== REQUIRED_CODE) {
-    alert("Code incorrect. Accès refusé.");
-    return;
-  }
 
   const id =
     fieldId.value ||
