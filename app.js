@@ -567,63 +567,67 @@ function closeModal() {
 // =====================
 // SAVE / DELETE
 // =====================
-
 function saveFromForm() {
+  const REQUIRED_CODE = "DC-Thales";
+  const enteredCode = document.getElementById("accessCode").value.trim();
+
+  if (enteredCode !== REQUIRED_CODE) {
+    alert("Code incorrect. Accès refusé.");
+    return;
+  }
+
+  const id =
+    fieldId.value ||
+    (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+
+  const existingIndex = entries.findIndex((e) => e.id === id);
+
+  const chosenYear = Number(fieldYear.value);
+  if (!years.includes(chosenYear)) {
+    years.push(chosenYear);
+    years.sort((a, b) => a - b);
+    saveJSON(YEARS_KEY, years);
+    refreshYearsSelects();
+    refreshManageLists();
+  }
+
+  const base = {
+    id,
+    title: fieldTitle.value.trim(),
+    category: fieldCategory.value.trim(),
+    theme1: fieldTheme1.value.trim(),
+    theme2: fieldTheme2.value.trim(),
+    description: fieldDescription.value.trim().slice(0, 200),
+    link: fieldLink.value.trim(),
+    month: Number(fieldMonth.value),
+    year: chosenYear,
+    imageUrl: fieldImageUrl.value.trim(),
+    imagePath: ""
+  };
+
+  const file = fieldImageFile.files[0];
+
   (async () => {
     try {
-      const enteredCode = (accessCodeEl?.value || "").trim();
-      if (enteredCode !== REQUIRED_CODE) {
-        alert("Code incorrect. Accès refusé.");
-        return;
-      }
-
-      const id =
-        fieldId.value ||
-        (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-
-      const chosenYear = Number(fieldYear.value);
-      if (!years.includes(chosenYear)) {
-        years.push(chosenYear);
-        years.sort((a, b) => a - b);
-        saveJSON(YEARS_KEY, years);
-        refreshYearsSelects();
-        refreshManageLists();
-      }
-
-      const base = {
-        id,
-        title: fieldTitle.value.trim(),
-        category: fieldCategory.value.trim(),
-        theme1: fieldTheme1.value.trim(),
-        theme2: fieldTheme2.value.trim(),
-        description: fieldDescription.value.trim().slice(0, 200),
-        link: fieldLink.value.trim(),
-        month: Number(fieldMonth.value),
-        year: chosenYear,
-        imageUrl: fieldImageUrl.value.trim(),
-        imagePath: ""
-      };
-
-      const file = fieldImageFile.files[0];
-
-      // Upload image (si fichier)
       if (file) {
         const uploaded = await uploadImageToSupabase(file, id);
         base.imageUrl = uploaded.publicUrl;
         base.imagePath = uploaded.path;
       }
 
-      // DB = source de vérité
-      await upsertEntryToSupabase(base);
+      if (existingIndex >= 0) entries[existingIndex] = base;
+      else entries.push(base);
 
-      // Reload depuis Supabase
-      await loadSharedData();
-
+      saveJSON(STORAGE_KEY, entries);
       refreshThemesFilters();
       refreshCategoriesList();
       refreshManageLists();
       render();
       closeModal();
+
+      await upsertEntryToSupabase(base);
+      await loadSharedData();
+      render();
     } catch (e) {
       console.error("Erreur sauvegarde:", e);
       alert("Impossible de sauvegarder en ligne.");
