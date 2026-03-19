@@ -221,17 +221,15 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const SUPABASE_URL = "https://dxilpdygitggghwbatzl.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWxwZHlnaXRnZ2dod2JhdHpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NjY2MjEsImV4cCI6MjA4MTU0MjYyMX0.agX-nXxgf-ix_W9e88-yZMldHO78M6qEFpN11n0zIIM";
+   <script>
+  const SUPABASE_URL = "https://vsjbxbarymrfykrjvjzy.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Dwg3azdtignqNh43iy4WHA_rMZxZ3YH"; 
 
-    window.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  window.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    window.sb.from("Entries").select("id").limit(1).then(({ data, error }) => {
-      console.log("Supabase test:", error ? "❌ KO" : "✅ OK", { data, error });
-    });
-  </script>
+  window.sb.from("Entries").select("id").limit(1).then(({ data, error }) => {
+    console.log("Supabase test:", error ? "❌ KO" : "✅ OK", { data, error });
+  });
+</script>
 
-  <!-- Ton app -->
-  <script src="app.js"></script>
-</body>
-</html>
+<script src="app.js"></script>
